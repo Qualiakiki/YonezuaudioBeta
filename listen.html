@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>试听 - 限时音频分享</title>
+<style>
+body{font-family:Arial;margin:20px;max-width:720px;text-align:center}
+h1{font-size:20px}
+button{padding:10px 18px;margin:8px;border-radius:6px;border:none;background:#1976d2;color:white;cursor:pointer}
+button[disabled]{background:#999;cursor:not-allowed}
+#msg{margin-top:20px;font-size:16px;color:#b00020}
+#playerControls{margin-top:18px;display:none}
+</style>
+</head>
+<body oncontextmenu="return false">
+<h1>限时音频试听</h1>
+<div id="msg">加载中…</div>
+<div id="playerControls">
+  <button id="play">播放</button>
+  <button id="pause">暂停</button>
+  <div style="margin-top:10px;font-size:14px;color:#444">请求自动停止播放以防超时，请勿右键保存</div>
+</div>
+
+<script>
+function getParam(n){ return new URLSearchParams(location.search).get(n); }
+
+window.addEventListener('load', ()=>{
+  const audioData = getParam('audio');
+  const expire = getParam('expire');
+  const msg = document.getElementById('msg');
+  const pc = document.getElementById('playerControls');
+
+  if(!audioData || !expire){ msg.textContent = '链接缺少参数或无效'; return; }
+  const expTs = parseInt(expire);
+  if(Date.now() > expTs){ msg.textContent = '音频已过期，无法播放'; return; }
+
+  let audio;
+  try{
+    const decoded = decodeURIComponent(audioData);
+    audio = new Audio(decoded);
+  }catch(e){
+    msg.textContent = '音频加载失败'; return;
+  }
+  // UI
+  msg.style.display = 'none'; pc.style.display = 'block';
+  const play = document.getElementById('play'), pause = document.getElementById('pause');
+  play.onclick = ()=> audio.play();
+  pause.onclick = ()=> audio.pause();
+
+  // Auto-stop when expired
+  const remain = expTs - Date.now();
+  const stopTimeout = setTimeout(()=>{
+    try{ audio.pause(); audio.src=''; }catch(e){}
+    msg.textContent = '音频已过期，播放已停止'; msg.style.display='block'; pc.style.display='none';
+  }, remain + 50);
+
+  // prevent easy download: no controls, disable context menu (body attr)
+  // still possible to extract if user inspects page or the URL
+});
+</script>
+</body>
+</html>

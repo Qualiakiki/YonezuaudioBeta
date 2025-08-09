@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>管理员 - 限时音频分享（前端）</title>
+<style>
+body{font-family:Arial;margin:20px;max-width:720px}
+h1{font-size:20px}
+input,button,select{padding:8px;margin:6px 0;width:100%;box-sizing:border-box}
+#linkOutput{word-break:break-all;background:#f3f3f3;padding:10px;border-radius:6px}
+.small{font-size:13px;color:#666}
+.row{display:flex;gap:8px}
+.row > *{flex:1;width:0}
+</style>
+</head>
+<body>
+<h1>管理员 - 限时音频分享（纯前端）</h1>
+<p class="small">密码登录后可以上传音频并生成可复制的试听链接（链接内含音频数据）。</p>
+
+<div id="loginBox">
+  <input id="pass" type="password" placeholder="请输入管理员密码" />
+  <button id="loginBtn">登录</button>
+  <p id="loginMsg" style="color:red"></p>
+</div>
+
+<div id="adminPanel" style="display:none">
+  <label>选择音频文件（max 50MB 建议）</label>
+  <input id="file" type="file" accept="audio/*"/>
+  <label>有效时长（分钟，默认60）</label>
+  <input id="expireMinutes" type="number" value="60" min="1" max="10080"/>
+  <div class="row">
+    <button id="genBtn">生成分享链接</button>
+    <button id="copyBtn" style="display:none">复制链接</button>
+  </div>
+  <div id="linkOutput" style="display:none"></div>
+  <p class="small">注意：这是纯前端实现，生成的链接会包含音频的 base64 数据，链接可能较长。技术熟练者仍可通过浏览器工具提取音频。</p>
+</div>
+
+<script>
+const ADMIN_PASS = "200901030839";
+
+const loginBtn = document.getElementById('loginBtn');
+const loginMsg = document.getElementById('loginMsg');
+const adminPanel = document.getElementById('adminPanel');
+const loginBox = document.getElementById('loginBox');
+const genBtn = document.getElementById('genBtn');
+const copyBtn = document.getElementById('copyBtn');
+const linkOutput = document.getElementById('linkOutput');
+const fileInput = document.getElementById('file');
+const expireInput = document.getElementById('expireMinutes');
+
+loginBtn.onclick = ()=>{
+  const v = document.getElementById('pass').value;
+  if(v === ADMIN_PASS){
+    loginBox.style.display = 'none';
+    adminPanel.style.display = 'block';
+    loginMsg.textContent = '';
+  }else{
+    loginMsg.textContent = '密码错误';
+  }
+};
+
+function uid(len=8){
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s='';
+  for(let i=0;i<len;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+genBtn.onclick = ()=>{
+  const f = fileInput.files[0];
+  if(!f){ alert('请先选择音频文件'); return; }
+  const maxMB = 50;
+  if(f.size > maxMB*1024*1024){ if(!confirm('文件超过 '+maxMB+'MB，继续可能产生非常长的链接，是否继续？')) return; }
+  const mins = parseInt(expireInput.value) || 60;
+  const expireTs = Date.now() + mins*60*1000;
+  const reader = new FileReader();
+  genBtn.disabled = true; genBtn.textContent = '正在生成...';
+  reader.onload = function(e){
+    try{
+      const dataUrl = e.target.result; // data:audio/..;base64,AAA
+      // Build listen URL (relative)
+      const listenPath = location.origin + location.pathname.replace(/index\.html?$/,'') + 'listen.html';
+      // Encode safely
+      const payload = encodeURIComponent(dataUrl);
+      const link = `${listenPath}?audio=${payload}&expire=${expireTs}`;
+      linkOutput.style.display = 'block';
+      linkOutput.innerHTML = '<b>分享链接（有效 '+mins+' 分钟）：</b><br><a href="'+link+'" target="_blank">'+link+'</a>';
+      copyBtn.style.display = 'inline-block';
+      copyBtn.onclick = ()=>{
+        navigator.clipboard.writeText(link).then(()=>{ alert('已复制到剪贴板'); }).catch(()=>{ prompt('请手动复制此链接：', link); });
+      };
+    }catch(err){
+      alert('生成失败：'+err);
+    }finally{
+      genBtn.disabled = false; genBtn.textContent = '生成分享链接';
+    }
+  };
+  reader.onerror = ()=>{ alert('读取文件失败'); genBtn.disabled=false; genBtn.textContent='生成分享链接'; };
+  reader.readAsDataURL(f);
+};
+</script>
+</body>
+</html>
